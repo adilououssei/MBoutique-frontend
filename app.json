@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "M Boutique",
+    "slug": "mboutique",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "mboutique",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#0F1A26",
+    "ios": {
+      "icon": "./assets/images/icon.png",
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0F1A26",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 120
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "M Boutique accède à vos photos pour ajouter l'image d'un produit.",
+          "cameraPermission": "M Boutique utilise l'appareil photo pour photographier vos produits."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
