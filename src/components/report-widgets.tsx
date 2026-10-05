@@ -13,6 +13,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   carte: 'Carte',
   virement: 'Virement',
   mixte: 'Mixte',
+  credit: 'À crédit',
 };
 
 const PAYMENT_COLORS = [C.primary, C.dark, C.success, C.warning, C.info];

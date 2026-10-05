@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,20 +32,26 @@ const newKey = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 /** Point de vente : panier local puis POST /ventes/encaisser (espèces). */
 export default function NouvelleVente() {
-  const { hasFeature } = useAuth();
+  // Arrivée depuis un rendez-vous : prestation et client pré-remplis.
+  const params = useLocalSearchParams<{ service_id?: string; client_id?: string; rendez_vous_id?: string }>();
+  const { hasFeature, can } = useAuth();
   const base = useStorePath();
   const insets = useSafeAreaInsets();
   const withServices = hasFeature('services');
   const withProducts = hasFeature('produits');
-  const [tab, setTab] = useState<'produits' | 'services'>(withProducts ? 'produits' : 'services');
+  const [tab, setTab] = useState<'produits' | 'services'>(withProducts && !params.service_id ? 'produits' : 'services');
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<Line[]>([]);
   const [registerId, setRegisterId] = useState<number | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [customerId, setCustomerId] = useState<number | null>(null);
+  const [customerId, setCustomerId] = useState<number | null>(params.client_id ? Number(params.client_id) : null);
   const [discount, setDiscount] = useState('');
   const [received, setReceived] = useState('');
+  // Vente à crédit : l'acompte entre en caisse, le reste va au compte du client.
+  const [payMode, setPayMode] = useState<'especes' | 'credit'>('especes');
+  const [deposit, setDeposit] = useState('');
+  const canCredit = hasFeature('clients') && can('credits.gerer');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   // Une même tentative d'encaissement garde sa clé : un double appui ou une
@@ -70,7 +76,15 @@ export default function NouvelleVente() {
 
   useEffect(() => {
     idempotencyKey.current = newKey();
-  }, [cart, customerId, discount, registerId]);
+  }, [cart, customerId, discount, registerId, payMode, deposit]);
+
+  useEffect(() => {
+    if (!params.service_id) return;
+    api
+      .get<Service>(`${base}/services/${params.service_id}`)
+      .then((service) => setCart((c) => (c.some((l) => l.kind === 'service' && l.service.id === service.id) ? c : [...c, { kind: 'service', service, qty: 1, discount: '' }])))
+      .catch(() => {});
+  }, [base, params.service_id]);
 
   function addProduct(product: Product) {
     const mode: PricingMode = product.vente_detail_active ? 'detail' : 'gros';
@@ -99,6 +113,11 @@ export default function NouvelleVente() {
   const count = cart.reduce((s, l) => s + l.qty, 0);
   const change = toNumber(cleanNumberInput(received)) - total;
   const invalidLine = cart.find((l) => lineDiscount(l) > lineGross(l));
+  const onCredit = payMode === 'credit';
+  const depositValue = toNumber(cleanNumberInput(deposit));
+  const owed = Math.max(0, total - depositValue);
+  const creditBlocked = onCredit && (!customerId || depositValue > total);
+  const selectedCustomer = customers.find((c) => c.id === customerId);
 
   async function checkout() {
     if (!activeRegisterId) return;
@@ -108,7 +127,8 @@ export default function NouvelleVente() {
       const { data } = await api.post<Sale>(`${base}/ventes/encaisser`, {
         caisse_id: activeRegisterId,
         client_id: customerId,
-        mode_paiement: 'especes',
+        mode_paiement: payMode,
+        acompte: onCredit ? depositValue : null,
         montant_remise: discountValue > 0 ? discountValue : null,
         cle_idempotence: idempotencyKey.current,
         lignes: cart.map((l) => {
@@ -119,6 +139,10 @@ export default function NouvelleVente() {
         }),
       });
       setCheckoutOpen(false);
+      if (params.rendez_vous_id) {
+        // La vente est faite : le rendez-vous passe à « terminé » et la référence.
+        await api.post(`${base}/rendez-vous/${params.rendez_vous_id}/statut`, { statut: 'termine', vente_id: data.id }).catch(() => {});
+      }
       router.replace({ pathname: '/ventes/[id]', params: { id: data.id, nouvelle: '1' } });
     } catch (e) {
       setError(e instanceof ApiError ? e : new ApiError('Encaissement impossible.', 0));
@@ -303,25 +327,68 @@ export default function NouvelleVente() {
 
       <Sheet visible={checkoutOpen} onClose={() => setCheckoutOpen(false)} title="Encaissement">
         {error && <ErrorBox message={error.code === 'VALIDATION_ECHOUEE' ? (Object.values(error.erreurs)[0]?.[0] ?? error.message) : error.message} />}
+        {canCredit && (
+          <View style={styles.tabs}>
+            <Chip label="Espèces" active={!onCredit} onPress={() => setPayMode('especes')} />
+            <Chip label="À crédit" active={onCredit} onPress={() => setPayMode('credit')} />
+          </View>
+        )}
         {hasFeature('clients') && (
           <SelectField
             label="Client"
-            placeholder="Client de passage"
-            value={customerId ?? 0}
+            required={onCredit}
+            placeholder={onCredit ? 'Choisir le client' : 'Client de passage'}
+            value={onCredit ? customerId : (customerId ?? 0)}
             onChange={(v) => setCustomerId(v === 0 ? null : v)}
-            options={[{ value: 0, label: 'Client de passage' }, ...customers.map((c) => ({ value: c.id, label: c.nom, description: c.telephone ?? undefined }))]}
+            options={[
+              ...(onCredit ? [] : [{ value: 0, label: 'Client de passage' }]),
+              ...customers.map((c) => ({
+                value: c.id,
+                label: c.nom,
+                description: toNumber(c.solde) > 0 ? `Doit déjà ${formatMoney(c.solde)}` : (c.telephone ?? undefined),
+              })),
+            ]}
+            error={error?.field('client_id')}
           />
         )}
+        {onCredit && !customerId && <Text style={styles.creditHelp}>Une vente à crédit doit être attribuée à un client.</Text>}
         <Field label="Remise globale" value={discount} onChangeText={setDiscount} keyboardType="decimal-pad" placeholder="0" suffix="FCFA" error={error?.field('montant_remise')} />
-        <Field label="Montant reçu" value={received} onChangeText={setReceived} keyboardType="decimal-pad" placeholder="Pour calculer la monnaie" suffix="FCFA" />
+        {onCredit ? (
+          <Field
+            label="Acompte payé maintenant"
+            value={deposit}
+            onChangeText={setDeposit}
+            keyboardType="decimal-pad"
+            placeholder="0"
+            suffix="FCFA"
+            error={depositValue > total ? "L'acompte dépasse le total." : error?.field('acompte')}
+          />
+        ) : (
+          <Field label="Montant reçu" value={received} onChangeText={setReceived} keyboardType="decimal-pad" placeholder="Pour calculer la monnaie" suffix="FCFA" />
+        )}
         <View style={styles.summary}>
           <Row label="Sous-total" value={formatMoney(subtotal)} />
           {discountValue > 0 && <Row label="Remise globale" value={`− ${formatMoney(discountValue)}`} />}
-          <Row label="Total à payer" value={formatMoney(total)} strong />
-          {received.trim() !== '' && <Row label="Monnaie à rendre" value={change >= 0 ? formatMoney(change) : `Manque ${formatMoney(-change)}`} color={change >= 0 ? C.success : C.danger} />}
+          <Row label="Total" value={formatMoney(total)} strong />
+          {onCredit ? (
+            <>
+              <Row label="Acompte (en caisse)" value={formatMoney(depositValue)} />
+              <Row label="Reste à crédit" value={formatMoney(owed)} color={C.danger} strong />
+              {selectedCustomer && toNumber(selectedCustomer.solde) > 0 && (
+                <Row label="Nouvelle dette du client" value={formatMoney(toNumber(selectedCustomer.solde) + owed)} />
+              )}
+            </>
+          ) : (
+            received.trim() !== '' && <Row label="Monnaie à rendre" value={change >= 0 ? formatMoney(change) : `Manque ${formatMoney(-change)}`} color={change >= 0 ? C.success : C.danger} />
+          )}
         </View>
-        <Text style={styles.cash}>Paiement en espèces</Text>
-        <Button title={`Encaisser ${formatMoney(total)}`} onPress={checkout} loading={saving} disabled={!activeRegisterId || !!invalidLine} />
+        {!canCredit && <Text style={styles.cash}>Paiement en espèces</Text>}
+        <Button
+          title={onCredit ? `Valider · ${formatMoney(owed)} à crédit` : `Encaisser ${formatMoney(total)}`}
+          onPress={checkout}
+          loading={saving}
+          disabled={!activeRegisterId || !!invalidLine || creditBlocked}
+        />
       </Sheet>
     </Screen>
   );
@@ -358,6 +425,7 @@ function Row({ label, value, strong, color }: { label: string; value: string; st
 }
 
 const styles = StyleSheet.create({
+  creditHelp: { fontSize: 12, color: C.danger, marginTop: -6 },
   top: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8, gap: 12 },
   tabs: { flexDirection: 'row', gap: 8 },
   list: { paddingHorizontal: 16, paddingBottom: 120, flexGrow: 1 },

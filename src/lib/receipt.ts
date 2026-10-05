@@ -26,7 +26,8 @@ export function receiptText(sale: Sale, store: Store | null): string {
   out.push('--------------------------------');
   out.push(`Sous-total : ${formatMoney(sale.sous_total)}`);
   if (toNumber(sale.remise) > 0) out.push(`Remise : -${formatMoney(sale.remise)}`);
-  out.push(`*TOTAL : ${formatMoney(sale.total)}*`, 'Paiement : Espèces');
+  out.push(`*TOTAL : ${formatMoney(sale.total)}*`, `Paiement : ${paymentLabel(sale)}`);
+  if (sale.montant_credit != null) out.push(`Acompte versé : ${formatMoney(sale.acompte)}`, `*Reste dû : ${formatMoney(sale.montant_credit)}*`);
   if (sale.client) out.push(`Client : ${sale.client.nom}`);
   if (sale.vendeur) out.push(`Vendeur : ${sale.vendeur.nom}`);
   out.push('', 'Merci pour votre achat !');
@@ -73,7 +74,8 @@ export function receiptHtml(sale: Sale, store: Store | null): string {
       <tr><td class="muted">Sous-total</td><td class="r">${esc(formatMoney(sale.sous_total))}</td></tr>
       ${toNumber(sale.remise) > 0 ? `<tr><td class="muted">Remise</td><td class="r">-${esc(formatMoney(sale.remise))}</td></tr>` : ''}
       <tr class="total"><td>TOTAL</td><td class="r">${esc(formatMoney(sale.total))}</td></tr>
-      <tr><td class="muted">Paiement</td><td class="r">Espèces</td></tr>
+      <tr><td class="muted">Paiement</td><td class="r">${esc(paymentLabel(sale))}</td></tr>
+      ${sale.montant_credit != null ? `<tr><td class="muted">Acompte versé</td><td class="r">${esc(formatMoney(sale.acompte))}</td></tr><tr class="total"><td>Reste dû</td><td class="r">${esc(formatMoney(sale.montant_credit))}</td></tr>` : ''}
       ${sale.client ? `<tr><td class="muted">Client</td><td class="r">${esc(sale.client.nom)}</td></tr>` : ''}
       ${sale.vendeur ? `<tr><td class="muted">Vendeur</td><td class="r">${esc(sale.vendeur.nom)}</td></tr>` : ''}
     </table>
@@ -100,4 +102,9 @@ export async function shareReceiptPdf(sale: Sale, store: Store | null) {
   } else {
     await Print.printAsync({ uri });
   }
+}
+
+/** « Espèces » ou « À crédit » — libellé du mode de paiement d'une vente. */
+export function paymentLabel(sale: Pick<Sale, 'mode_paiement'>): string {
+  return sale.mode_paiement === 'credit' ? 'À crédit' : sale.mode_paiement === 'especes' ? 'Espèces' : sale.mode_paiement;
 }

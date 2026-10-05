@@ -16,10 +16,13 @@ export default function Plus() {
   const { user, store, hasFeature, can, logout } = useAuth();
 
   const gestion: Item[] = [
+    { label: 'Commandes', description: 'Salle, à emporter, dépôts', icon: 'restaurant', href: '/commandes', visible: hasFeature('commandes') && can('commandes.voir') },
+    { label: 'Rendez-vous', description: 'Agenda et réservations', icon: 'calendar', href: '/rendez-vous', visible: hasFeature('rendez_vous') && can('rendez_vous.voir') },
     { label: 'Stock', description: 'Quantités, seuils et mouvements', icon: 'cube', href: '/stock', visible: hasFeature('stock') && can('stock.voir') },
     { label: 'Caisse', description: 'Sessions, entrées et sorties', icon: 'calculator', href: '/caisse', visible: hasFeature('caisse') && can('caisse.voir') },
     { label: 'Clients', description: 'Carnet de clients', icon: 'people', href: '/clients', visible: hasFeature('clients') && can('clients.voir') },
     { label: 'Fournisseurs', description: 'Contacts et soldes dus', icon: 'business', href: '/fournisseurs', visible: hasFeature('fournisseurs') && can('fournisseurs.voir') },
+    { label: 'Employés', description: 'Personnel, salaires et avances', icon: 'id-card', href: '/employes', visible: hasFeature('employes') && can('employes.voir') },
     { label: 'Achats', description: 'Réceptions de marchandise et règlements', icon: 'receipt', href: '/achats', visible: hasFeature('fournisseurs') && can('achats.voir') },
     { label: 'Catégories', description: 'Organisation du catalogue', icon: 'pricetags', href: '/categories', visible: hasFeature('categories') && can('categories.voir') },
     { label: 'Services', description: 'Prestations proposées', icon: 'construct', href: '/services', visible: hasFeature('services') && can('services.voir') },

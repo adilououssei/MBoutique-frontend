@@ -75,7 +75,7 @@ export default function Ventes() {
               </View>
               <View style={{ alignItems: 'flex-end', gap: 5 }}>
                 <Text style={styles.total}>{formatMoney(item.total)}</Text>
-                {item.statut === 'annulee' ? <Badge label="Annulée" tone="danger" /> : <Badge label="Espèces" tone="success" />}
+                {item.statut === 'annulee' ? <Badge label="Annulée" tone="danger" /> : item.mode_paiement === 'credit' ? <Badge label="À crédit" tone="warning" /> : <Badge label="Espèces" tone="success" />}
               </View>
             </Pressable>
           )}

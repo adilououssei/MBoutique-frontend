@@ -57,6 +57,9 @@ export const UNITS: { value: ProductUnit; label: string; short: string }[] = [
   { value: 'paquet', label: 'Paquet', short: 'paquets' },
 ];
 
+/** Suffixe d'affichage d'un salaire : « 75 000 FCFA / mois ». */
+export const SALARY_PERIOD_LABELS = { mensuel: '/ mois', hebdomadaire: '/ semaine', journalier: '/ jour' } as const;
+
 export function unitShort(unit: ProductUnit | undefined): string {
   return UNITS.find((u) => u.value === unit)?.short ?? 'unités';
 }

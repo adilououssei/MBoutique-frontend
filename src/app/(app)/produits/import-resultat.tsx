@@ -28,6 +28,7 @@ export default function ResultatImport() {
         </View>
         <Text style={styles.title}>{ok ? 'Import terminé !' : report.importes > 0 ? 'Import partiel' : 'Aucun produit importé'}</Text>
         <Text style={styles.sub}>{formatNumber(report.total_lignes)} ligne(s) analysée(s)</Text>
+        {!!report.stocks_initialises && <Text style={styles.sub}>Stock initial enregistré pour {formatNumber(report.stocks_initialises)} produit(s)</Text>}
       </View>
 
       <View style={styles.stats}>

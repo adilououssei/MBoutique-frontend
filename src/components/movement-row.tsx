@@ -17,6 +17,8 @@ export const STOCK_MOVEMENTS: Record<StockMovementType, Look> = {
   ajustement_entree: { label: 'Ajustement', icon: 'swap-vertical', color: C.info },
   ajustement_sortie: { label: 'Ajustement', icon: 'swap-vertical', color: C.info },
   inventaire: { label: 'Inventaire', icon: 'clipboard', color: C.info },
+  transfert_sortie: { label: 'Transfert envoyé', icon: 'arrow-forward-circle', color: C.warning },
+  transfert_entree: { label: 'Transfert reçu', icon: 'arrow-back-circle', color: C.success },
 };
 
 export const CASH_MOVEMENTS: Record<CashMovementType, Look> = {

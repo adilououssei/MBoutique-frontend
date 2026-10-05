@@ -93,7 +93,23 @@ export type StockMovementType =
   | 'ajustement_entree'
   | 'ajustement_sortie'
   | 'inventaire'
-  | 'perte';
+  | 'perte'
+  | 'transfert_sortie'
+  | 'transfert_entree';
+
+/** Transfert de stock entre deux boutiques de l'entreprise (`sens` relatif à la boutique courante). */
+export type StockTransfer = {
+  id: number;
+  reference: string;
+  sens: 'sortant' | 'entrant';
+  source: { id: number; nom: string };
+  destination: { id: number; nom: string };
+  nombre_articles?: number;
+  lignes?: { produit_id: number; nom_produit: string; quantite: Decimal; produit_cree: boolean }[];
+  note: string | null;
+  par?: { id: number; nom: string } | null;
+  cree_le: string;
+};
 
 export type StockMovement = {
   id: number;
@@ -115,6 +131,20 @@ export type Customer = {
   adresse: string | null;
   notes: string | null;
   actif: boolean;
+  /** Dette en cours (négatif = avoir) — liste et fiche client. */
+  solde?: Decimal;
+};
+
+/** Ligne du compte client : + vente à crédit, − paiement ou annulation. */
+export type CustomerAccountEntry = {
+  id: number;
+  type: 'vente_credit' | 'paiement' | 'annulation_vente';
+  montant: Decimal;
+  mode: 'caisse' | 'externe' | null;
+  vente: { id: number; reference: string | null } | null;
+  note: string | null;
+  par?: { id: number; nom: string } | null;
+  cree_le: string;
 };
 
 export type CashRegister = {
@@ -179,6 +209,9 @@ export type Sale = {
   remise: Decimal;
   total: Decimal;
   mode_paiement: string;
+  /** Vente à crédit : payé comptant à la vente / reste mis sur le compte client. */
+  acompte?: Decimal | null;
+  montant_credit?: Decimal | null;
   statut: 'terminee' | 'annulee';
   vendue_le: string;
   annulation: { le: string; motif: string; par?: { id: number; nom: string } | null } | null;
@@ -195,6 +228,7 @@ export type StoreMember = {
 export type ImportReport = {
   total_lignes: number;
   importes: number;
+  stocks_initialises?: number;
   rejetes: number;
   erreurs: { ligne: number; erreurs: Record<string, string[]> }[];
 };
@@ -254,4 +288,108 @@ export type Purchase = {
   cree_par?: { id: number; nom: string } | null;
   lignes?: { produit_id: number; nom_produit: string; quantite: Decimal; cout_unitaire: Decimal; total: Decimal }[];
   paiements?: { id: number; montant: Decimal; mode: 'caisse' | 'externe'; note: string | null; paye_le: string; cree_par: { id: number; nom: string } | null }[];
+};
+
+export type SalaryPeriod = 'mensuel' | 'hebdomadaire' | 'journalier';
+
+export type Employee = {
+  id: number;
+  nom: string;
+  poste: string | null;
+  telephone: string | null;
+  adresse: string | null;
+  date_embauche: string | null;
+  salaire: Decimal | null;
+  periodicite_salaire: SalaryPeriod | null;
+  notes: string | null;
+  actif: boolean;
+  compte?: { id: number; nom: string; email: string } | null;
+  /** Somme versée depuis le 1er du mois (salaire + avances + primes). */
+  paye_ce_mois?: Decimal;
+};
+
+export type EmployeePaymentType = 'salaire' | 'avance' | 'prime';
+
+export type EmployeePayment = {
+  id: number;
+  type: EmployeePaymentType;
+  montant: Decimal;
+  periode: string | null;
+  mode: 'caisse' | 'externe';
+  note: string | null;
+  paye_le: string;
+  cree_par?: { id: number; nom: string } | null;
+};
+
+export type AppointmentStatus = 'prevu' | 'confirme' | 'termine' | 'annule' | 'absent';
+
+export type Appointment = {
+  id: number;
+  service?: { id: number; nom: string; prix: Decimal; duree_minutes: number | null };
+  employe?: { id: number; nom: string } | null;
+  client?: { id: number; nom: string; telephone: string | null } | null;
+  /** Nom/téléphone à afficher (client enregistré ou saisi à la réservation). */
+  nom_client: string | null;
+  telephone_client: string | null;
+  debut_le: string;
+  fin_le: string;
+  statut: AppointmentStatus;
+  notes: string | null;
+  motif_annulation: string | null;
+  vente_id: number | null;
+};
+
+export type OrderType = 'sur_place' | 'a_emporter' | 'livraison' | 'depot';
+export type OrderStatus = 'en_attente' | 'en_preparation' | 'prete' | 'servie' | 'payee' | 'annulee';
+
+export type OrderLine = {
+  id: number;
+  type: 'produit' | 'service';
+  produit_id: number | null;
+  service_id: number | null;
+  mode_prix: PricingMode | null;
+  nom: string;
+  quantite: Decimal;
+  prix_unitaire: Decimal;
+  total: Decimal;
+  note: string | null;
+};
+
+export type Order = {
+  id: number;
+  reference: string;
+  type: OrderType;
+  statut: OrderStatus;
+  table?: { id: number; nom: string } | null;
+  client?: { id: number; nom: string; telephone: string | null } | null;
+  nom_client: string | null;
+  telephone_client: string | null;
+  adresse_livraison: string | null;
+  date_promise: string | null;
+  note: string | null;
+  lignes?: OrderLine[];
+  total?: Decimal;
+  nombre_articles?: number;
+  vente_id: number | null;
+  motif_annulation: string | null;
+  cree_le: string;
+};
+
+export type DiningTable = {
+  id: number;
+  nom: string;
+  capacite: number | null;
+  actif: boolean;
+  occupee: boolean;
+  commande: { id: number; reference: string; statut: OrderStatus; total: Decimal | null; ouverte_le: string } | null;
+};
+
+export type AppNotification = {
+  id: string;
+  categorie: 'stock' | 'commande_prete' | 'rendez_vous' | 'rappel_rendez_vous' | null;
+  titre: string;
+  message: string;
+  lien: { ecran: 'stock' | 'commande' | 'rendez_vous'; id: number } | null;
+  lue: boolean;
+  cree_le: string;
 };

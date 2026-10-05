@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
@@ -19,7 +20,14 @@ export default function StockListe() {
   const list = usePagedList<Stock>(`${base}/stocks`, { recherche: search, stock_faible: low ? 1 : undefined });
 
   return (
-    <Screen title="Stock" scroll={false}>
+    <Screen
+      title="Stock"
+      scroll={false}
+      right={
+        <Pressable onPress={() => router.push('/transferts')} hitSlop={10} accessibilityLabel="Transferts entre boutiques">
+          <Ionicons name="swap-horizontal" size={22} color={C.white} />
+        </Pressable>
+      }>
       <View style={styles.top}>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Rechercher un produit..." />
         <View style={styles.chips}>

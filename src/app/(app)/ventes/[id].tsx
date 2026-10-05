@@ -13,7 +13,7 @@ import { useAuth, useStorePath } from '@/context/auth';
 import { api, ApiError } from '@/lib/api';
 import { notify } from '@/lib/dialog';
 import { formatDateTime, formatMoney, formatQty, toNumber } from '@/lib/format';
-import { shareReceiptPdf, shareReceiptText } from '@/lib/receipt';
+import { paymentLabel, shareReceiptPdf, shareReceiptText } from '@/lib/receipt';
 import type { CashRegister, Sale } from '@/lib/types';
 import { useApi } from '@/lib/use-api';
 
@@ -147,7 +147,13 @@ export default function DetailVente() {
           </View>
 
           <Card style={{ paddingVertical: 4 }}>
-            <InfoRow label="Paiement" value={sale.mode_paiement === 'especes' ? 'Espèces' : sale.mode_paiement} />
+            <InfoRow label="Paiement" value={paymentLabel(sale)} />
+            {sale.montant_credit != null && (
+              <>
+                <InfoRow label="Acompte versé" value={formatMoney(sale.acompte)} />
+                <InfoRow label="Mis à crédit" value={<Text style={{ color: C.danger, fontWeight: '800' }}>{formatMoney(sale.montant_credit)}</Text>} />
+              </>
+            )}
             <InfoRow label="Client" value={sale.client?.nom ?? 'Client de passage'} />
             <InfoRow label="Vendeur" value={sale.vendeur?.nom ?? '—'} />
           </Card>
@@ -160,7 +166,9 @@ export default function DetailVente() {
             <Ionicons name="alert-circle" size={20} color={C.danger} />
             <Text style={styles.warningText}>
               {productUnits > 0 ? `${formatQty(productUnits)} article(s) seront remis en stock et ` : ''}
-              {formatMoney(sale.total)} seront sortis de la caisse pour rembourser le client. Cette action est définitive.
+              {sale.montant_credit != null
+                ? `${formatMoney(sale.acompte)} (l'acompte) seront sortis de la caisse et ${formatMoney(sale.montant_credit)} retirés de la dette du client. Cette action est définitive.`
+                : `${formatMoney(sale.total)} seront sortis de la caisse pour rembourser le client. Cette action est définitive.`}
             </Text>
           </View>
         )}

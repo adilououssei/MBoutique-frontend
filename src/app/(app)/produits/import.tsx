@@ -14,7 +14,7 @@ import type { ImportReport } from '@/lib/types';
 import { appendFile } from '@/lib/upload';
 
 const MAX_BYTES = 5 * 1024 * 1024;
-const COLUMNS = ['nom', 'categorie', 'description', 'sku', 'code_barres', 'unite', 'prix_achat', 'vente_detail_active', 'prix_detail', 'vente_gros_active', 'prix_gros', 'actif'];
+const COLUMNS = ['nom', 'categorie', 'description', 'sku', 'code_barres', 'unite', 'prix_achat', 'vente_detail_active', 'prix_detail', 'vente_gros_active', 'prix_gros', 'actif', 'stock_initial', 'stock_minimum'];
 
 function formatSize(bytes?: number) {
   if (!bytes) return '';
@@ -103,6 +103,10 @@ export default function ImportExcel() {
         <View style={styles.infoRow}>
           <Ionicons name="checkmark-circle" size={15} color={C.success} />
           <Text style={styles.infoLine}>Les catégories doivent déjà exister dans la boutique.</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Ionicons name="checkmark-circle" size={15} color={C.success} />
+          <Text style={styles.infoLine}>stock_initial (optionnel) : quantité en rayon, le produit est prêt à vendre.</Text>
         </View>
         <View style={styles.infoRow}>
           <Ionicons name="checkmark-circle" size={15} color={C.success} />

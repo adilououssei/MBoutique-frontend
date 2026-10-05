@@ -12,18 +12,21 @@ const stockFull = ['stock.voir', 'stock.ajuster', 'stock.inventorier'];
 const cashFull = ['caisse.voir', 'caisse.gerer', 'caisse.ouvrir', 'caisse.fermer', 'caisse.ajuster'];
 const cashCashier = ['caisse.voir', 'caisse.ouvrir', 'caisse.fermer', 'caisse.ajuster'];
 const salesFull = ['ventes.voir', 'ventes.creer'];
+const ordersStaff = ['commandes.voir', 'commandes.creer', 'commandes.modifier'];
+const appointmentsFull = ['rendez_vous.voir', 'rendez_vous.creer', 'rendez_vous.modifier', 'rendez_vous.annuler'];
 const suppliersFull = ['fournisseurs.voir', 'fournisseurs.creer', 'fournisseurs.modifier', 'fournisseurs.supprimer', 'achats.voir', 'achats.creer'];
 
 // rapports.voir : propriétaire, administrateur et gérant seulement (le bénéfice estimé révèle les prix d'achat).
 // ventes.annuler : encadrement seulement (remise en stock + remboursement en caisse).
-const manager = [...catalogFull, 'produits.importer', ...customersFull, ...stockFull, ...cashFull, ...salesFull, 'ventes.annuler', ...suppliersFull, 'rapports.voir', 'membres.voir'];
+// credits.gerer : vendre à crédit et encaisser les remboursements (caissier inclus).
+const manager = [...catalogFull, 'produits.importer', ...customersFull, ...stockFull, ...cashFull, ...salesFull, 'ventes.annuler', 'credits.gerer', ...suppliersFull, 'employes.voir', 'employes.gerer', ...appointmentsFull, ...ordersStaff, 'commandes.annuler', 'tables.gerer', 'rapports.voir', 'membres.voir'];
 
 const ROLES: Record<StoreRoleName, string[]> = {
   proprietaire: [...manager, 'membres.gerer'],
   administrateur: [...manager, 'membres.gerer'],
   gerant: manager,
-  caissier: ['membres.voir', ...catalogRead, 'clients.voir', 'stock.voir', ...cashCashier, ...salesFull, 'fournisseurs.voir'],
-  employe: ['membres.voir', ...catalogRead, 'clients.voir', 'stock.voir', 'caisse.voir', 'ventes.voir'],
+  caissier: ['membres.voir', ...catalogRead, 'clients.voir', 'stock.voir', ...cashCashier, ...salesFull, 'credits.gerer', 'fournisseurs.voir', ...appointmentsFull, ...ordersStaff, 'commandes.annuler'],
+  employe: ['membres.voir', ...catalogRead, 'clients.voir', 'stock.voir', 'caisse.voir', 'ventes.voir', 'rendez_vous.voir', ...ordersStaff],
 };
 
 export function roleCan(role: StoreRoleName | null | undefined, permission: string): boolean {

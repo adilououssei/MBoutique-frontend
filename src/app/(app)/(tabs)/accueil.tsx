@@ -7,6 +7,7 @@ import { BarChart, Trend } from '@/components/report-widgets';
 import { StoreSwitcher } from '@/components/store-switcher';
 import { Card, IconCircle, type IconName } from '@/components/ui/elements';
 import { Screen } from '@/components/ui/screen';
+import { NotificationBell } from '@/components/notification-bell';
 import { C, R } from '@/constants/colors';
 import { useAuth, useStorePath } from '@/context/auth';
 import { api } from '@/lib/api';
@@ -18,6 +19,8 @@ type Tile = { title: string; subtitle: string; icon: IconName; href: Href; featu
 
 const TILES: Tile[] = [
   { title: 'Produits', subtitle: 'Gérer vos produits', icon: 'bag-handle', href: '/produits', feature: 'produits' },
+  { title: 'Commandes', subtitle: 'Salle et commandes en cours', icon: 'restaurant', href: '/commandes', feature: 'commandes' },
+  { title: 'Rendez-vous', subtitle: 'Agenda du jour', icon: 'calendar', href: '/rendez-vous', feature: 'rendez_vous' },
   { title: 'Ventes', subtitle: 'Enregistrer une vente', icon: 'cart', href: '/ventes/nouvelle', feature: 'ventes' },
   { title: 'Stock', subtitle: 'Suivre le stock', icon: 'cube', href: '/stock', feature: 'stock' },
   { title: 'Caisse', subtitle: 'Gérer la caisse', icon: 'calculator', href: '/caisse', feature: 'caisse' },
@@ -66,9 +69,12 @@ export default function Accueil() {
               <Image source={require('@/assets/images/logo-mark-fond-noir.png')} style={styles.logo} contentFit="contain" />
               <Text style={styles.brandText}>Boutique</Text>
             </View>
-            <Pressable onPress={() => router.push('/profil')} style={styles.avatar} accessibilityLabel="Mon profil">
-              <Ionicons name="person" size={18} color={C.dark} />
-            </Pressable>
+            <View style={styles.headerActions}>
+              <NotificationBell />
+              <Pressable onPress={() => router.push('/profil')} style={styles.avatar} accessibilityLabel="Mon profil">
+                <Ionicons name="person" size={18} color={C.dark} />
+              </Pressable>
+            </View>
           </View>
           <StoreSwitcher />
         </View>
@@ -177,6 +183,7 @@ const styles = StyleSheet.create({
   logo: { width: 34, height: 34 },
   brandText: { color: C.primary, fontSize: 24, fontWeight: '800' },
   avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#DDE2E8', alignItems: 'center', justifyContent: 'center' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   hello: { fontSize: 22, fontWeight: '800', color: C.text },
   question: { fontSize: 14, color: C.text, marginTop: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
