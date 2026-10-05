@@ -12,15 +12,17 @@ const stockFull = ['stock.voir', 'stock.ajuster', 'stock.inventorier'];
 const cashFull = ['caisse.voir', 'caisse.gerer', 'caisse.ouvrir', 'caisse.fermer', 'caisse.ajuster'];
 const cashCashier = ['caisse.voir', 'caisse.ouvrir', 'caisse.fermer', 'caisse.ajuster'];
 const salesFull = ['ventes.voir', 'ventes.creer'];
+const suppliersFull = ['fournisseurs.voir', 'fournisseurs.creer', 'fournisseurs.modifier', 'fournisseurs.supprimer', 'achats.voir', 'achats.creer'];
 
 // rapports.voir : propriétaire, administrateur et gérant seulement (le bénéfice estimé révèle les prix d'achat).
-const manager = [...catalogFull, 'produits.importer', ...customersFull, ...stockFull, ...cashFull, ...salesFull, 'rapports.voir', 'membres.voir'];
+// ventes.annuler : encadrement seulement (remise en stock + remboursement en caisse).
+const manager = [...catalogFull, 'produits.importer', ...customersFull, ...stockFull, ...cashFull, ...salesFull, 'ventes.annuler', ...suppliersFull, 'rapports.voir', 'membres.voir'];
 
 const ROLES: Record<StoreRoleName, string[]> = {
   proprietaire: [...manager, 'membres.gerer'],
   administrateur: [...manager, 'membres.gerer'],
   gerant: manager,
-  caissier: ['membres.voir', ...catalogRead, 'clients.voir', 'stock.voir', ...cashCashier, ...salesFull],
+  caissier: ['membres.voir', ...catalogRead, 'clients.voir', 'stock.voir', ...cashCashier, ...salesFull, 'fournisseurs.voir'],
   employe: ['membres.voir', ...catalogRead, 'clients.voir', 'stock.voir', 'caisse.voir', 'ventes.voir'],
 };
 

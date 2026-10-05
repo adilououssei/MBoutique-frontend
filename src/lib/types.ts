@@ -156,11 +156,16 @@ export type CashMovement = {
 export type PricingMode = 'detail' | 'gros';
 
 export type SaleLine = {
-  produit_id: number;
+  type: 'produit' | 'service';
+  produit_id: number | null;
+  service_id: number | null;
+  /** Libellé figé au moment de la vente (produit ou service). */
   nom_produit: string;
-  mode_prix: PricingMode;
+  mode_prix: PricingMode | null;
   quantite: Decimal;
   prix_unitaire: Decimal;
+  /** Remise sur la ligne (montant). */
+  remise: Decimal;
   total: Decimal;
 };
 
@@ -176,6 +181,7 @@ export type Sale = {
   mode_paiement: string;
   statut: 'terminee' | 'annulee';
   vendue_le: string;
+  annulation: { le: string; motif: string; par?: { id: number; nom: string } | null } | null;
 };
 
 export type StoreMember = {
@@ -217,4 +223,35 @@ export type DashboardReport = {
   courbe: { granularite: 'heure' | 'jour'; points: ReportPoint[] };
   meilleurs_produits: { produit_id: number; nom: string; quantite: Decimal; chiffre_affaires: Decimal }[];
   modes_paiement: { mode: string; montant: Decimal; nombre_ventes: number }[];
+};
+
+export type Supplier = {
+  id: number;
+  nom: string;
+  nom_contact: string | null;
+  telephone: string | null;
+  email: string | null;
+  adresse: string | null;
+  notes: string | null;
+  actif: boolean;
+  total_achats?: Decimal;
+  /** Reste dû au fournisseur (somme des achats − somme réglée). */
+  solde_du?: Decimal;
+};
+
+export type PurchasePaymentStatus = 'paye' | 'partiel' | 'non_paye';
+
+export type Purchase = {
+  id: number;
+  reference: string;
+  fournisseur?: { id: number; nom: string } | null;
+  montant_total: Decimal;
+  montant_paye: Decimal;
+  reste_a_payer: Decimal;
+  statut_paiement: PurchasePaymentStatus;
+  note: string | null;
+  achete_le: string;
+  cree_par?: { id: number; nom: string } | null;
+  lignes?: { produit_id: number; nom_produit: string; quantite: Decimal; cout_unitaire: Decimal; total: Decimal }[];
+  paiements?: { id: number; montant: Decimal; mode: 'caisse' | 'externe'; note: string | null; paye_le: string; cree_par: { id: number; nom: string } | null }[];
 };

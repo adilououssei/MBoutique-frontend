@@ -17,7 +17,7 @@ function resolveBaseUrl(): string {
   const host = Constants.expoConfig?.hostUri?.split(':')[0];
   if (host && host !== 'localhost' && host !== '127.0.0.1') return `http://${host}:8000/api`;
 
-  return Platform.OS === 'android' ? 'http://10.0.119.161:8000/api' : 'http://localhost:8000/api';
+  return Platform.OS === 'android' ? 'http://192.168.1.65:8000/api' : 'http://localhost:8000/api';
 }
 
 export const API_URL = resolveBaseUrl();

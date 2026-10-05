@@ -40,7 +40,8 @@
           "photosPermission": "M Boutique accède à vos photos pour ajouter l'image d'un produit.",
           "cameraPermission": "M Boutique utilise l'appareil photo pour photographier vos produits."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

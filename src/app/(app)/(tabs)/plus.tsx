@@ -19,6 +19,8 @@ export default function Plus() {
     { label: 'Stock', description: 'Quantités, seuils et mouvements', icon: 'cube', href: '/stock', visible: hasFeature('stock') && can('stock.voir') },
     { label: 'Caisse', description: 'Sessions, entrées et sorties', icon: 'calculator', href: '/caisse', visible: hasFeature('caisse') && can('caisse.voir') },
     { label: 'Clients', description: 'Carnet de clients', icon: 'people', href: '/clients', visible: hasFeature('clients') && can('clients.voir') },
+    { label: 'Fournisseurs', description: 'Contacts et soldes dus', icon: 'business', href: '/fournisseurs', visible: hasFeature('fournisseurs') && can('fournisseurs.voir') },
+    { label: 'Achats', description: 'Réceptions de marchandise et règlements', icon: 'receipt', href: '/achats', visible: hasFeature('fournisseurs') && can('achats.voir') },
     { label: 'Catégories', description: 'Organisation du catalogue', icon: 'pricetags', href: '/categories', visible: hasFeature('categories') && can('categories.voir') },
     { label: 'Services', description: 'Prestations proposées', icon: 'construct', href: '/services', visible: hasFeature('services') && can('services.voir') },
   ];

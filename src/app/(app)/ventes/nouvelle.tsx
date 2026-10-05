@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
-import { EmptyState, ErrorBox, Loading, SearchBar, Thumb } from '@/components/ui/elements';
+import { Chip, EmptyState, ErrorBox, Loading, SearchBar, Thumb } from '@/components/ui/elements';
 import { Field } from '@/components/ui/field';
 import { Screen } from '@/components/ui/screen';
 import { SelectField, Sheet } from '@/components/ui/sheet';
@@ -13,13 +13,21 @@ import { C, R } from '@/constants/colors';
 import { useAuth, useStorePath } from '@/context/auth';
 import { api, ApiError } from '@/lib/api';
 import { cleanNumberInput, formatMoney, formatQty, toNumber } from '@/lib/format';
-import type { CashRegister, Customer, PricingMode, Product, Sale } from '@/lib/types';
+import type { CashRegister, Customer, PricingMode, Product, Sale, Service } from '@/lib/types';
 import { useApi } from '@/lib/use-api';
 import { usePagedList } from '@/lib/use-paged-list';
 
-type Line = { product: Product; mode: PricingMode; qty: number };
+/** Une ligne du panier : un produit (avec son mode détail/gros) ou un service. */
+type Line =
+  | { kind: 'produit'; product: Product; mode: PricingMode; qty: number; discount: string }
+  | { kind: 'service'; service: Service; qty: number; discount: string };
 
-const unitPrice = (l: Line) => toNumber(l.mode === 'detail' ? l.product.prix_detail : l.product.prix_gros);
+const lineName = (l: Line) => (l.kind === 'produit' ? l.product.nom : l.service.nom);
+const lineKey = (l: Line) => (l.kind === 'produit' ? `p-${l.product.id}-${l.mode}` : `s-${l.service.id}`);
+const unitPrice = (l: Line) => (l.kind === 'service' ? toNumber(l.service.prix) : toNumber(l.mode === 'detail' ? l.product.prix_detail : l.product.prix_gros));
+const lineGross = (l: Line) => unitPrice(l) * l.qty;
+const lineDiscount = (l: Line) => toNumber(cleanNumberInput(l.discount));
+const lineNet = (l: Line) => lineGross(l) - lineDiscount(l);
 const newKey = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 /** Point de vente : panier local puis POST /ventes/encaisser (espèces). */
@@ -27,6 +35,9 @@ export default function NouvelleVente() {
   const { hasFeature } = useAuth();
   const base = useStorePath();
   const insets = useSafeAreaInsets();
+  const withServices = hasFeature('services');
+  const withProducts = hasFeature('produits');
+  const [tab, setTab] = useState<'produits' | 'services'>(withProducts ? 'produits' : 'services');
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<Line[]>([]);
   const [registerId, setRegisterId] = useState<number | null>(null);
@@ -41,7 +52,9 @@ export default function NouvelleVente() {
   // relance après coupure réseau ne crée pas deux ventes (idempotence backend).
   const idempotencyKey = useRef(newKey());
 
-  const products = usePagedList<Product>(`${base}/produits`, { recherche: search, actif: true }, 30);
+  const products = usePagedList<Product>(tab === 'produits' ? `${base}/produits` : null, { recherche: search, actif: true }, 30);
+  const services = usePagedList<Service>(tab === 'services' ? `${base}/services` : null, { recherche: search, actif: true }, 30);
+  const list = tab === 'produits' ? products : services;
   const { data: registers, loading: loadingRegisters } = useApi(() => api.page<CashRegister>(`${base}/caisses`, { actif: true, par_page: 100 }).then((r) => r.donnees), [base]);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
@@ -59,23 +72,33 @@ export default function NouvelleVente() {
     idempotencyKey.current = newKey();
   }, [cart, customerId, discount, registerId]);
 
-  function add(product: Product) {
+  function addProduct(product: Product) {
     const mode: PricingMode = product.vente_detail_active ? 'detail' : 'gros';
     setCart((c) => {
-      const i = c.findIndex((l) => l.product.id === product.id && l.mode === mode);
+      const i = c.findIndex((l) => l.kind === 'produit' && l.product.id === product.id && l.mode === mode);
       if (i >= 0) return c.map((l, j) => (j === i ? { ...l, qty: l.qty + 1 } : l));
-      return [...c, { product, mode, qty: 1 }];
+      return [...c, { kind: 'produit', product, mode, qty: 1, discount: '' }];
     });
   }
 
-  const update = (i: number, patch: Partial<Line>) => setCart((c) => c.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  function addService(service: Service) {
+    setCart((c) => {
+      const i = c.findIndex((l) => l.kind === 'service' && l.service.id === service.id);
+      if (i >= 0) return c.map((l, j) => (j === i ? { ...l, qty: l.qty + 1 } : l));
+      return [...c, { kind: 'service', service, qty: 1, discount: '' }];
+    });
+  }
+
+  const update = (i: number, patch: Partial<{ mode: PricingMode; qty: number; discount: string }>) =>
+    setCart((c) => c.map((l, j) => (j === i ? ({ ...l, ...patch } as Line) : l)));
   const removeLine = (i: number) => setCart((c) => c.filter((_, j) => j !== i));
 
-  const subtotal = cart.reduce((s, l) => s + unitPrice(l) * l.qty, 0);
+  const subtotal = cart.reduce((s, l) => s + lineNet(l), 0);
   const discountValue = toNumber(cleanNumberInput(discount));
   const total = Math.max(0, subtotal - discountValue);
   const count = cart.reduce((s, l) => s + l.qty, 0);
   const change = toNumber(cleanNumberInput(received)) - total;
+  const invalidLine = cart.find((l) => lineDiscount(l) > lineGross(l));
 
   async function checkout() {
     if (!activeRegisterId) return;
@@ -88,7 +111,12 @@ export default function NouvelleVente() {
         mode_paiement: 'especes',
         montant_remise: discountValue > 0 ? discountValue : null,
         cle_idempotence: idempotencyKey.current,
-        lignes: cart.map((l) => ({ produit_id: l.product.id, mode_prix: l.mode, quantite: l.qty })),
+        lignes: cart.map((l) => {
+          const remise = lineDiscount(l) > 0 ? lineDiscount(l) : null;
+          return l.kind === 'produit'
+            ? { produit_id: l.product.id, mode_prix: l.mode, quantite: l.qty, remise }
+            : { service_id: l.service.id, quantite: l.qty, remise };
+        }),
       });
       setCheckoutOpen(false);
       router.replace({ pathname: '/ventes/[id]', params: { id: data.id, nouvelle: '1' } });
@@ -126,16 +154,22 @@ export default function NouvelleVente() {
         {openRegisters.length > 1 && (
           <SelectField label="Caisse" value={activeRegisterId} onChange={setRegisterId} options={openRegisters.map((r) => ({ value: r.id, label: r.nom }))} />
         )}
-        <SearchBar value={search} onChangeText={setSearch} placeholder="Rechercher un produit..." />
+        {withProducts && withServices && (
+          <View style={styles.tabs}>
+            <Chip label="Produits" active={tab === 'produits'} onPress={() => setTab('produits')} />
+            <Chip label="Services" active={tab === 'services'} onPress={() => setTab('services')} />
+          </View>
+        )}
+        <SearchBar value={search} onChangeText={setSearch} placeholder={tab === 'produits' ? 'Rechercher un produit...' : 'Rechercher un service...'} />
       </View>
 
-      {products.loading ? (
+      {list.loading ? (
         <Loading />
-      ) : (
+      ) : tab === 'produits' ? (
         <FlatList
           data={products.items}
           keyExtractor={(p) => String(p.id)}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120, flexGrow: 1 }}
+          contentContainerStyle={styles.list}
           onEndReached={products.loadMore}
           onEndReachedThreshold={0.4}
           keyboardShouldPersistTaps="handled"
@@ -143,31 +177,40 @@ export default function NouvelleVente() {
           ListFooterComponent={products.loadingMore ? <ActivityIndicator color={C.primary} style={{ margin: 16 }} /> : null}
           ListEmptyComponent={<EmptyState icon="search-outline" title="Aucun produit" />}
           renderItem={({ item }) => {
-            const inCart = cart.filter((l) => l.product.id === item.id).reduce((s, l) => s + l.qty, 0);
+            const inCart = cart.filter((l) => l.kind === 'produit' && l.product.id === item.id).reduce((s, l) => s + l.qty, 0);
             const sellable = item.vente_detail_active || item.vente_gros_active;
             return (
-              <Pressable onPress={() => sellable && add(item)} disabled={!sellable} style={({ pressed }) => [styles.product, pressed && { backgroundColor: C.background }, !sellable && { opacity: 0.5 }]}>
-                <Thumb name={item.nom} size={46} uri={item.image_url} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.pName} numberOfLines={1}>
-                    {item.nom}
-                  </Text>
-                  <Text style={styles.pPrice}>
-                    {item.vente_detail_active ? formatMoney(item.prix_detail) : ''}
-                    {item.vente_detail_active && item.vente_gros_active ? '  ·  ' : ''}
-                    {item.vente_gros_active ? `Gros ${formatMoney(item.prix_gros)}` : ''}
-                  </Text>
-                </View>
-                {inCart > 0 ? (
-                  <View style={styles.qtyBadge}>
-                    <Text style={styles.qtyBadgeText}>{formatQty(inCart)}</Text>
-                  </View>
-                ) : (
-                  <Ionicons name="add-circle" size={30} color={C.primary} />
-                )}
-              </Pressable>
+              <CatalogRow
+                name={item.nom}
+                thumb={<Thumb name={item.nom} size={46} uri={item.image_url} />}
+                price={[item.vente_detail_active ? formatMoney(item.prix_detail) : '', item.vente_gros_active ? `Gros ${formatMoney(item.prix_gros)}` : ''].filter(Boolean).join('  ·  ')}
+                inCart={inCart}
+                disabled={!sellable}
+                onPress={() => addProduct(item)}
+              />
             );
           }}
+        />
+      ) : (
+        <FlatList
+          data={services.items}
+          keyExtractor={(s) => String(s.id)}
+          contentContainerStyle={styles.list}
+          onEndReached={services.loadMore}
+          onEndReachedThreshold={0.4}
+          keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={services.error ? <ErrorBox message={services.error} onRetry={services.reload} /> : null}
+          ListFooterComponent={services.loadingMore ? <ActivityIndicator color={C.primary} style={{ margin: 16 }} /> : null}
+          ListEmptyComponent={<EmptyState icon="construct-outline" title="Aucun service" message="Ajoutez vos prestations depuis Plus → Services." />}
+          renderItem={({ item }) => (
+            <CatalogRow
+              name={item.nom}
+              thumb={<Thumb name={item.nom} size={46} icon="construct" />}
+              price={`${formatMoney(item.prix)}${item.duree_minutes ? `  ·  ${item.duree_minutes} min` : ''}`}
+              inCart={cart.filter((l) => l.kind === 'service' && l.service.id === item.id).reduce((s, l) => s + l.qty, 0)}
+              onPress={() => addService(item)}
+            />
+          )}
         />
       )}
 
@@ -185,60 +228,81 @@ export default function NouvelleVente() {
               <Text style={styles.barTotal}>{formatMoney(subtotal)}</Text>
             </View>
           </Pressable>
-          <Button title="Encaisser" onPress={() => setCheckoutOpen(true)} style={{ flex: 1, maxWidth: 170 }} />
+          <Button title="Encaisser" onPress={() => setCheckoutOpen(true)} style={{ flex: 1, maxWidth: 170 }} disabled={!!invalidLine} />
         </View>
       )}
 
       <Sheet visible={cartOpen} onClose={() => setCartOpen(false)} title={`Panier (${cart.length})`}>
-        {cart.map((l, i) => (
-          <View key={`${l.product.id}-${l.mode}`} style={styles.line}>
-            <View style={styles.lineHead}>
-              <Text style={styles.lineName} numberOfLines={1}>
-                {l.product.nom}
-              </Text>
-              <Pressable onPress={() => removeLine(i)} hitSlop={8} accessibilityLabel="Retirer">
-                <Ionicons name="trash-outline" size={18} color={C.danger} />
-              </Pressable>
-            </View>
-            <View style={styles.lineBody}>
-              {l.product.vente_detail_active && l.product.vente_gros_active ? (
-                <View style={styles.modes}>
-                  {(['detail', 'gros'] as const).map((m) => (
-                    <Pressable key={m} onPress={() => update(i, { mode: m })} style={[styles.mode, l.mode === m && styles.modeActive]}>
-                      <Text style={[styles.modeText, l.mode === m && { color: C.white }]}>{m === 'detail' ? 'Détail' : 'Gros'}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.meta}>{l.mode === 'detail' ? 'Détail' : 'Gros'}</Text>
-              )}
-              <View style={styles.stepper}>
-                <Pressable onPress={() => (l.qty > 1 ? update(i, { qty: l.qty - 1 }) : removeLine(i))} style={styles.step} hitSlop={6}>
-                  <Ionicons name="remove" size={18} color={C.text} />
-                </Pressable>
-                <Text style={styles.stepQty}>{formatQty(l.qty)}</Text>
-                <Pressable onPress={() => update(i, { qty: l.qty + 1 })} style={styles.step} hitSlop={6}>
-                  <Ionicons name="add" size={18} color={C.text} />
+        {cart.map((l, i) => {
+          const tooMuch = lineDiscount(l) > lineGross(l);
+          return (
+            <View key={lineKey(l)} style={styles.line}>
+              <View style={styles.lineHead}>
+                <Text style={styles.lineName} numberOfLines={1}>
+                  {lineName(l)}
+                </Text>
+                <Pressable onPress={() => removeLine(i)} hitSlop={8} accessibilityLabel="Retirer">
+                  <Ionicons name="trash-outline" size={18} color={C.danger} />
                 </Pressable>
               </View>
+              <View style={styles.lineBody}>
+                {l.kind === 'produit' && l.product.vente_detail_active && l.product.vente_gros_active ? (
+                  <View style={styles.modes}>
+                    {(['detail', 'gros'] as const).map((m) => (
+                      <Pressable key={m} onPress={() => update(i, { mode: m })} style={[styles.mode, l.mode === m && styles.modeActive]}>
+                        <Text style={[styles.modeText, l.mode === m && { color: C.white }]}>{m === 'detail' ? 'Détail' : 'Gros'}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.meta}>{l.kind === 'service' ? 'Service' : l.mode === 'detail' ? 'Détail' : 'Gros'}</Text>
+                )}
+                <View style={styles.stepper}>
+                  <Pressable onPress={() => (l.qty > 1 ? update(i, { qty: l.qty - 1 }) : removeLine(i))} style={styles.step} hitSlop={6}>
+                    <Ionicons name="remove" size={18} color={C.text} />
+                  </Pressable>
+                  <Text style={styles.stepQty}>{formatQty(l.qty)}</Text>
+                  <Pressable onPress={() => update(i, { qty: l.qty + 1 })} style={styles.step} hitSlop={6}>
+                    <Ionicons name="add" size={18} color={C.text} />
+                  </Pressable>
+                </View>
+              </View>
+              <View style={styles.discountRow}>
+                <Ionicons name="pricetag-outline" size={16} color={C.textMuted} />
+                <Text style={styles.meta}>Remise</Text>
+                <TextInput
+                  value={l.discount}
+                  onChangeText={(v) => update(i, { discount: v })}
+                  keyboardType="decimal-pad"
+                  placeholder="0"
+                  placeholderTextColor={C.textLight}
+                  style={[styles.discountInput, tooMuch && { borderColor: C.danger }, { outlineStyle: 'none' } as object]}
+                />
+                <Text style={styles.meta}>FCFA</Text>
+              </View>
+              {tooMuch ? (
+                <Text style={styles.lineError}>La remise dépasse le montant de la ligne ({formatMoney(lineGross(l))}).</Text>
+              ) : (
+                <Text style={styles.lineTotal}>
+                  {formatQty(l.qty)} × {formatMoney(unitPrice(l))}
+                  {lineDiscount(l) > 0 ? ` − ${formatMoney(lineDiscount(l))}` : ''} = <Text style={{ color: C.text, fontWeight: '800' }}>{formatMoney(lineNet(l))}</Text>
+                </Text>
+              )}
             </View>
-            <Text style={styles.lineTotal}>
-              {formatQty(l.qty)} × {formatMoney(unitPrice(l))} = <Text style={{ color: C.text, fontWeight: '800' }}>{formatMoney(unitPrice(l) * l.qty)}</Text>
-            </Text>
-          </View>
-        ))}
+          );
+        })}
         <Button
           title="Passer à l'encaissement"
           onPress={() => {
             setCartOpen(false);
             setCheckoutOpen(true);
           }}
-          disabled={cart.length === 0}
+          disabled={cart.length === 0 || !!invalidLine}
         />
       </Sheet>
 
       <Sheet visible={checkoutOpen} onClose={() => setCheckoutOpen(false)} title="Encaissement">
-        {error && <ErrorBox message={error.code === 'VALIDATION_ECHOUEE' ? Object.values(error.erreurs)[0]?.[0] ?? error.message : error.message} />}
+        {error && <ErrorBox message={error.code === 'VALIDATION_ECHOUEE' ? (Object.values(error.erreurs)[0]?.[0] ?? error.message) : error.message} />}
         {hasFeature('clients') && (
           <SelectField
             label="Client"
@@ -248,18 +312,39 @@ export default function NouvelleVente() {
             options={[{ value: 0, label: 'Client de passage' }, ...customers.map((c) => ({ value: c.id, label: c.nom, description: c.telephone ?? undefined }))]}
           />
         )}
-        <Field label="Remise" value={discount} onChangeText={setDiscount} keyboardType="decimal-pad" placeholder="0" suffix="FCFA" error={error?.field('montant_remise')} />
+        <Field label="Remise globale" value={discount} onChangeText={setDiscount} keyboardType="decimal-pad" placeholder="0" suffix="FCFA" error={error?.field('montant_remise')} />
         <Field label="Montant reçu" value={received} onChangeText={setReceived} keyboardType="decimal-pad" placeholder="Pour calculer la monnaie" suffix="FCFA" />
         <View style={styles.summary}>
           <Row label="Sous-total" value={formatMoney(subtotal)} />
-          {discountValue > 0 && <Row label="Remise" value={`− ${formatMoney(discountValue)}`} />}
+          {discountValue > 0 && <Row label="Remise globale" value={`− ${formatMoney(discountValue)}`} />}
           <Row label="Total à payer" value={formatMoney(total)} strong />
           {received.trim() !== '' && <Row label="Monnaie à rendre" value={change >= 0 ? formatMoney(change) : `Manque ${formatMoney(-change)}`} color={change >= 0 ? C.success : C.danger} />}
         </View>
         <Text style={styles.cash}>Paiement en espèces</Text>
-        <Button title={`Encaisser ${formatMoney(total)}`} onPress={checkout} loading={saving} disabled={!activeRegisterId} />
+        <Button title={`Encaisser ${formatMoney(total)}`} onPress={checkout} loading={saving} disabled={!activeRegisterId || !!invalidLine} />
       </Sheet>
     </Screen>
+  );
+}
+
+function CatalogRow({ name, thumb, price, inCart, disabled, onPress }: { name: string; thumb: React.ReactNode; price: string; inCart: number; disabled?: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.product, pressed && { backgroundColor: C.background }, disabled && { opacity: 0.5 }]}>
+      {thumb}
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={styles.pName} numberOfLines={1}>
+          {name}
+        </Text>
+        <Text style={styles.pPrice}>{price}</Text>
+      </View>
+      {inCart > 0 ? (
+        <View style={styles.qtyBadge}>
+          <Text style={styles.qtyBadgeText}>{formatQty(inCart)}</Text>
+        </View>
+      ) : (
+        <Ionicons name="add-circle" size={30} color={C.primary} />
+      )}
+    </Pressable>
   );
 }
 
@@ -274,6 +359,8 @@ function Row({ label, value, strong, color }: { label: string; value: string; st
 
 const styles = StyleSheet.create({
   top: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8, gap: 12 },
+  tabs: { flexDirection: 'row', gap: 8 },
+  list: { paddingHorizontal: 16, paddingBottom: 120, flexGrow: 1 },
   product: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: C.border },
   pName: { fontSize: 15, fontWeight: '700', color: C.text },
   pPrice: { fontSize: 12, color: C.textMuted },
@@ -311,7 +398,10 @@ const styles = StyleSheet.create({
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   step: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   stepQty: { fontSize: 16, fontWeight: '800', color: C.text, minWidth: 28, textAlign: 'center' },
+  discountRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  discountInput: { flex: 1, height: 36, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 10, fontSize: 14, color: C.text, textAlign: 'right' },
   lineTotal: { fontSize: 12, color: C.textMuted, textAlign: 'right' },
+  lineError: { fontSize: 12, color: C.danger, textAlign: 'right' },
   summary: { backgroundColor: C.background, borderRadius: R.md, padding: 14, gap: 8 },
   sumRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sumLabel: { fontSize: 13, color: C.textMuted },
