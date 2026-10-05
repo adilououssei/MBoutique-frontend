@@ -8,6 +8,7 @@ import { C, R } from '@/constants/colors';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/dialog';
 import type { Product } from '@/lib/types';
+import { appendFile } from '@/lib/upload';
 
 /** Choix de l'utilisateur pour la photo : garder l'actuelle, en mettre une nouvelle, ou la retirer. */
 export type PhotoChoice = { kind: 'keep' } | { kind: 'new'; asset: ImagePicker.ImagePickerAsset } | { kind: 'remove' };
@@ -85,11 +86,7 @@ export async function applyPhotoChoice(base: string, product: Product, choice: P
   const { asset } = choice;
   const form = new FormData();
   const name = asset.fileName ?? `produit-${product.id}.jpg`;
-  if (Platform.OS === 'web' && asset.file) {
-    form.append('image', asset.file, name);
-  } else {
-    form.append('image', { uri: asset.uri, name, type: asset.mimeType ?? 'image/jpeg' } as unknown as Blob);
-  }
+  appendFile(form, 'image', { uri: asset.uri, name, mimeType: asset.mimeType ?? 'image/jpeg', webFile: asset.file });
   return (await api.upload<Product>(url, form)).data;
 }
 

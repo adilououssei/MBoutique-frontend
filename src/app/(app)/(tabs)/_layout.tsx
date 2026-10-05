@@ -18,7 +18,7 @@ function icon(active: IconName, inactive: IconName) {
 }
 
 export default function TabsLayout() {
-  const { store, hasFeature } = useAuth();
+  const { store, hasFeature, can } = useAuth();
   const insets = useSafeAreaInsets();
   if (!store) return <Redirect href="/bienvenue" />;
 
@@ -40,7 +40,11 @@ export default function TabsLayout() {
       <Tabs.Screen name="accueil" options={{ title: 'Accueil', tabBarIcon: icon('home', 'home-outline') }} />
       <Tabs.Screen name="produits" options={{ title: 'Produits', tabBarIcon: icon('cube', 'cube-outline'), href: hasFeature('produits') ? undefined : null }} />
       <Tabs.Screen name="ventes" options={{ title: 'Ventes', tabBarIcon: icon('cart', 'cart-outline'), href: hasFeature('ventes') ? undefined : null }} />
-      <Tabs.Screen name="plus" options={{ title: 'Plus', tabBarIcon: icon('apps', 'apps-outline') }} />
+      <Tabs.Screen
+        name="rapports"
+        options={{ title: 'Rapports', tabBarIcon: icon('stats-chart', 'stats-chart-outline'), href: hasFeature('rapports') && can('rapports.voir') ? undefined : null }}
+      />
+      <Tabs.Screen name="plus"options={{ title: 'Plus', tabBarIcon: icon('apps', 'apps-outline') }} />
     </Tabs>
   );
 }

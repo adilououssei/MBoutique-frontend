@@ -11,6 +11,7 @@ import { C, R } from '@/constants/colors';
 import { useStorePath } from '@/context/auth';
 import { api, ApiError } from '@/lib/api';
 import type { ImportReport } from '@/lib/types';
+import { appendFile } from '@/lib/upload';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const COLUMNS = ['nom', 'categorie', 'description', 'sku', 'code_barres', 'unite', 'prix_achat', 'vente_detail_active', 'prix_detail', 'vente_gros_active', 'prix_gros', 'actif'];
@@ -51,11 +52,7 @@ export default function ImportExcel() {
     setError(null);
     try {
       const form = new FormData();
-      if (Platform.OS === 'web' && file.file) {
-        form.append('fichier', file.file, file.name);
-      } else {
-        form.append('fichier', { uri: file.uri, name: file.name, type: file.mimeType ?? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } as unknown as Blob);
-      }
+      appendFile(form, 'fichier', { uri: file.uri, name: file.name, mimeType: file.mimeType ?? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', webFile: file.file });
       const { data } = await api.upload<ImportReport>(`${base}/produits/importer`, form);
       router.replace({ pathname: '/produits/import-resultat', params: { rapport: JSON.stringify(data) } });
     } catch (e) {

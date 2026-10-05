@@ -13,7 +13,8 @@ const cashFull = ['caisse.voir', 'caisse.gerer', 'caisse.ouvrir', 'caisse.fermer
 const cashCashier = ['caisse.voir', 'caisse.ouvrir', 'caisse.fermer', 'caisse.ajuster'];
 const salesFull = ['ventes.voir', 'ventes.creer'];
 
-const manager = [...catalogFull, 'produits.importer', ...customersFull, ...stockFull, ...cashFull, ...salesFull, 'membres.voir'];
+// rapports.voir : propriétaire, administrateur et gérant seulement (le bénéfice estimé révèle les prix d'achat).
+const manager = [...catalogFull, 'produits.importer', ...customersFull, ...stockFull, ...cashFull, ...salesFull, 'rapports.voir', 'membres.voir'];
 
 const ROLES: Record<StoreRoleName, string[]> = {
   proprietaire: [...manager, 'membres.gerer'],

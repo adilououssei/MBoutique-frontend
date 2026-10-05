@@ -192,3 +192,29 @@ export type ImportReport = {
   rejetes: number;
   erreurs: { ligne: number; erreurs: Record<string, string[]> }[];
 };
+
+// --- Rapports (GET /boutiques/{id}/rapports/tableau-de-bord) ---
+
+export type ReportPeriod = 'aujourdhui' | '7_jours' | '30_jours' | 'ce_mois';
+
+export type ReportPoint = { cle: string; libelle: string; chiffre_affaires: Decimal; nombre_ventes: number };
+
+export type DashboardReport = {
+  periode: { code: ReportPeriod; libelle: string; du: string; au: string; fuseau_horaire: string };
+  resume: {
+    chiffre_affaires: Decimal;
+    nombre_ventes: number;
+    panier_moyen: Decimal;
+    articles_vendus: Decimal;
+    remises: Decimal;
+    /** null si aucun produit vendu n'a de prix d'achat. */
+    benefice_estime: Decimal | null;
+    produits_sans_prix_achat: number;
+  };
+  periode_precedente: { du: string; au: string; chiffre_affaires: Decimal; nombre_ventes: number; articles_vendus: Decimal };
+  /** Variation en % par rapport à la période précédente ; null si elle valait 0. */
+  evolution: { chiffre_affaires: number | null; nombre_ventes: number | null; articles_vendus: number | null; panier_moyen: number | null };
+  courbe: { granularite: 'heure' | 'jour'; points: ReportPoint[] };
+  meilleurs_produits: { produit_id: number; nom: string; quantite: Decimal; chiffre_affaires: Decimal }[];
+  modes_paiement: { mode: string; montant: Decimal; nombre_ventes: number }[];
+};
